@@ -1,10 +1,12 @@
 from django.shortcuts import get_object_or_404, render
+from django.db.models import Count
+from django.core.paginator import Paginator
 from datetime import datetime
 
 from blog.models import Category, Post
 
 
-COUNT_POSTS = 5
+COUNT_POSTS = 10
 
 
 def get_posts(post_objects=Post.objects):
@@ -19,9 +21,12 @@ def get_posts(post_objects=Post.objects):
 
 def index(request):
     template = 'blog/index.html'
-    post_list = get_posts()[0:COUNT_POSTS]
-    context = {
-        'post_list': post_list
+    post_list = get_posts().annotate(comment_count=Count('comments'))
+    paginator = Paginator(post_list, COUNT_POSTS)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    context = {        
+        'page_obj': page_obj
     }
     return render(request, template, context)
 
