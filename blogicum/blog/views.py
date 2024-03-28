@@ -55,9 +55,13 @@ def category_posts(request, category_slug):
         is_published=True,
         slug=category_slug
     )
+    post_list = get_posts(category.posts)
+    page_number = request.GET.get('page')
+    paginator = Paginator(post_list, COUNT_POSTS)
+    page_obj = paginator.get_page(page_number)
     context = {
         'category': category,
-        'post_list': get_posts(category.posts)
+        "page_obj": page_obj
     }
     return render(request, template, context)
 
@@ -88,6 +92,7 @@ class ProfileListView(ListView):
 class ProfileUpdateView(LoginRequiredMixin, UpdateView):
     model = User
     fields = ["username", "first_name", "last_name", "email"]
+    template_name = 'blog/user.html'
 
     def get_object(self, queryset=None):
         return self.request.user
