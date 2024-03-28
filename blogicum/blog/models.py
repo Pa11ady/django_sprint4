@@ -25,6 +25,8 @@ class Post(BaseModel):
     category = models.ForeignKey('Category', on_delete=models.SET_NULL,
                                  null=True, verbose_name='Категория',
                                  related_name='posts')
+    image = models.ImageField('Изображение', upload_to='posts_images',
+                              null=True, blank=True)
 
     class Meta:
         verbose_name = 'публикация'

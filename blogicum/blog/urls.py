@@ -1,4 +1,6 @@
 from django.urls import path
+from django.conf import settings
+from django.conf.urls.static import static
 
 from . import views
 
@@ -18,4 +20,4 @@ urlpatterns = [
          name='profile'),
     path('profile/<slug:username>/edit/', views.ProfileUpdateView.as_view(),
          name='edit_profile'),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
