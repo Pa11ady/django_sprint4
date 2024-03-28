@@ -6,8 +6,10 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
 from django.db.models import Count
 from django.shortcuts import get_object_or_404, render
-from django.urls import reverse
-from django.views.generic import ListView, UpdateView
+from django.urls import reverse_lazy
+from django.views.generic import CreateView, ListView, UpdateView
+
+from .forms import PostForm
 
 COUNT_POSTS = 10
 
@@ -61,7 +63,7 @@ def category_posts(request, category_slug):
     page_obj = paginator.get_page(page_number)
     context = {
         'category': category,
-        "page_obj": page_obj
+        'page_obj': page_obj
     }
     return render(request, template, context)
 
@@ -80,8 +82,8 @@ class ProfileListView(ListView):
     def get_queryset(self):
         author = self.get_user()
         if author == self.request.user:
-            return author.posts
-        return get_posts()
+            return author.posts.all()
+        return get_posts(author.posts)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -91,14 +93,30 @@ class ProfileListView(ListView):
 
 class ProfileUpdateView(LoginRequiredMixin, UpdateView):
     model = User
-    fields = ["username", "first_name", "last_name", "email"]
+    fields = ['username', 'first_name', 'last_name', 'email']
     template_name = 'blog/user.html'
 
     def get_object(self, queryset=None):
         return self.request.user
 
     def get_success_url(self):
-        return reverse(
-            "blog:profile",
-            kwargs={"username": self.request.user.username}
+        return reverse_lazy(
+            'blog:profile',
+            kwargs={'username': self.request.user}
+        )
+
+
+class PostCreateView(LoginRequiredMixin, CreateView):
+    model = Post
+    form_class = PostForm
+    template_name = 'blog/create.html'
+
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse_lazy(
+            'blog:profile',
+            kwargs={'username': self.request.user}
         )

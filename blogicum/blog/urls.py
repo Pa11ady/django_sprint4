@@ -14,10 +14,11 @@ def test():
 urlpatterns = [
     path('', views.index, name='index'),
     path('posts/<int:id>/', views.post_detail, name='post_detail'),
+    path('posts/create/', views.PostCreateView.as_view(), name='create_post'),
     path('category/<slug:category_slug>/', views.category_posts,
          name='category_posts'),
     path('profile/<slug:username>/', views.ProfileListView.as_view(),
          name='profile'),
-    path('profile/<slug:username>/edit/', views.ProfileUpdateView.as_view(),
-         name='edit_profile'),
+    path('edit_profile/',
+         views.ProfileUpdateView.as_view(), name='edit_profile')
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
