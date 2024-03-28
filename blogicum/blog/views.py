@@ -1,12 +1,17 @@
-from django.shortcuts import get_object_or_404, render
-from django.db.models import Count
-from django.core.paginator import Paginator
 from datetime import datetime
 
 from blog.models import Category, Post
-
+from django.contrib.auth import get_user_model
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.paginator import Paginator
+from django.db.models import Count
+from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
+from django.views.generic import ListView, UpdateView
 
 COUNT_POSTS = 10
+
+User = get_user_model()
 
 
 def get_posts(post_objects=Post.objects):
@@ -25,7 +30,7 @@ def index(request):
     paginator = Paginator(post_list, COUNT_POSTS)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    context = {        
+    context = {
         'page_obj': page_obj
     }
     return render(request, template, context)
@@ -55,3 +60,40 @@ def category_posts(request, category_slug):
         'post_list': get_posts(category.posts)
     }
     return render(request, template, context)
+
+
+class ProfileListView(ListView):
+    model = Post
+    paginate_by = COUNT_POSTS
+    template_name = 'blog/profile.html'
+
+    def get_user(self):
+        return get_object_or_404(
+            User,
+            username=self.kwargs['username']
+        )
+
+    def get_queryset(self):
+        author = self.get_user()
+        if author == self.request.user:
+            return author.posts
+        return get_posts()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['profile'] = self.get_user()
+        return context
+
+
+class ProfileUpdateView(LoginRequiredMixin, UpdateView):
+    model = User
+    fields = ["username", "first_name", "last_name", "email"]
+
+    def get_object(self, queryset=None):
+        return self.request.user
+
+    def get_success_url(self):
+        return reverse(
+            "blog:profile",
+            kwargs={"username": self.request.user.username}
+        )
