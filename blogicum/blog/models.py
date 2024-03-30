@@ -1,8 +1,6 @@
-from django.db import models
-from django.contrib.auth import get_user_model
-
 from core.models import BaseModel
-
+from django.contrib.auth import get_user_model
+from django.db import models
 
 User = get_user_model()
 
@@ -31,6 +29,7 @@ class Post(BaseModel):
     class Meta:
         verbose_name = 'публикация'
         verbose_name_plural = 'Публикации'
+        ordering = ('-pub_date',)
 
     def __str__(self):
         return self.title
@@ -66,7 +65,7 @@ class Location(BaseModel):
 
 
 class Comment(BaseModel):
-    text = models.TextField('Текст')    
+    text = models.TextField('Текст')
     author = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
