@@ -1,6 +1,5 @@
 from datetime import datetime
 
-from blog.models import Category, Comment, Post
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -13,8 +12,9 @@ from django.views import View
 from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 
 from .forms import CommentForm, PostForm
+from .models import Category, Comment, Post
 
-COUNT_POSTS = 10
+PER_PAGE = 10
 
 User = get_user_model()
 
@@ -26,17 +26,18 @@ def get_posts(post_objects=Post.objects):
         is_published=True,
         category__is_published=True,
         pub_date__lte=datetime.now()
-    ).order_by("-pub_date").annotate(comment_count=Count('comments'))
+    ).order_by('-pub_date').annotate(comment_count=Count('comments'))
+
+
+def get_page_obj(object_list, page_number):
+    return Paginator(object_list, PER_PAGE).get_page(page_number)
 
 
 def index(request):
     template = 'blog/index.html'
-    post_list = get_posts().annotate(comment_count=Count('comments'))
-    paginator = Paginator(post_list, COUNT_POSTS)
     page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
     context = {
-        'page_obj': page_obj
+        'page_obj': get_page_obj(get_posts(), page_number)
     }
     return render(request, template, context)
 
@@ -67,20 +68,17 @@ def category_posts(request, category_slug):
         is_published=True,
         slug=category_slug
     )
-    post_list = get_posts(category.posts)
     page_number = request.GET.get('page')
-    paginator = Paginator(post_list, COUNT_POSTS)
-    page_obj = paginator.get_page(page_number)
     context = {
         'category': category,
-        'page_obj': page_obj
+        'page_obj': get_page_obj(get_posts(category.posts), page_number)
     }
     return render(request, template, context)
 
 
 class ProfileListView(ListView):
     model = Post
-    paginate_by = COUNT_POSTS
+    paginate_by = PER_PAGE
     template_name = 'blog/profile.html'
 
     def get_user(self):
@@ -122,6 +120,17 @@ class PostMixin:
     template_name = 'blog/create.html'
 
 
+class AuthorizationMixin(LoginRequiredMixin, View):
+    def dispatch(self, request, *args, **kwargs):
+        post = get_object_or_404(
+            Post,
+            pk=kwargs['pk']
+        )
+        if (request.user != post.author):
+            return redirect('blog:post_detail', pk=post.pk)
+        return super().dispatch(request, *args, **kwargs)
+
+
 class PostCreateView(PostMixin, LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         form.instance.author = self.request.user
@@ -134,34 +143,14 @@ class PostCreateView(PostMixin, LoginRequiredMixin, CreateView):
         )
 
 
-class PostUpdateView(PostMixin, LoginRequiredMixin, UpdateView):
-    def dispatch(self, request, *args, **kwargs):
-        post = get_object_or_404(
-            Post,
-            pk=kwargs['pk']
-        )
-        if ((request.user != post.author)
-           or (not self.request.user.is_authenticated)):
-            return redirect('blog:post_detail', pk=post.pk)
-        return super().dispatch(request, *args, **kwargs)
-
+class PostUpdateView(PostMixin, AuthorizationMixin, UpdateView):
     def get_success_url(self):
-        post = self.object
-        return reverse_lazy('blog:post_detail', kwargs={'pk': post.pk})
+        return reverse_lazy('blog:post_detail',
+                            kwargs={'pk': self.kwargs['pk']})
 
 
-class PostDeleteView(PostMixin, LoginRequiredMixin, DeleteView):
+class PostDeleteView(PostMixin, AuthorizationMixin, DeleteView):
     success_url = reverse_lazy('blog:index')
-
-    def dispatch(self, request, *args, **kwargs):
-        post = get_object_or_404(
-            Post,
-            pk=kwargs['pk']
-        )
-        if ((request.user != post.author)
-           or (not self.request.user.is_authenticated)):
-            return redirect('blog:post_detail', pk=post.pk)
-        return super().dispatch(request, *args, **kwargs)
 
 
 @login_required
@@ -188,7 +177,7 @@ def add_comment(request, post_id, comment_id=None):
 
 class CommentMixin(LoginRequiredMixin, View):
     model = Comment
-    template_name = "blog/comment.html"
+    template_name = 'blog/comment.html'
 
     def dispatch(self, request, *args, **kwargs):
         comment = get_object_or_404(
