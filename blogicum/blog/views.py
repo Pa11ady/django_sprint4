@@ -1,36 +1,17 @@
-from datetime import datetime
-
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import PermissionDenied
-from django.core.paginator import Paginator
-from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
-from django.views import View
 from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 
-from .forms import CommentForm, PostForm
+from .constants import PER_PAGE
+from .forms import CommentForm
+from .mixins import AuthorizationMixin, CommentMixin, PostMixin
 from .models import Category, Comment, Post
-
-PER_PAGE = 10
+from .utils import get_page_obj, get_posts
 
 User = get_user_model()
-
-
-def get_posts(post_objects=Post.objects):
-    return post_objects.select_related(
-        'category', 'location', 'author'
-    ).filter(
-        is_published=True,
-        category__is_published=True,
-        pub_date__lte=datetime.now()
-    ).order_by('-pub_date').annotate(comment_count=Count('comments'))
-
-
-def get_page_obj(object_list, page_number):
-    return Paginator(object_list, PER_PAGE).get_page(page_number)
 
 
 def index(request):
@@ -114,23 +95,6 @@ class ProfileUpdateView(LoginRequiredMixin, UpdateView):
         )
 
 
-class PostMixin:
-    model = Post
-    form_class = PostForm
-    template_name = 'blog/create.html'
-
-
-class AuthorizationMixin(LoginRequiredMixin, View):
-    def dispatch(self, request, *args, **kwargs):
-        post = get_object_or_404(
-            Post,
-            pk=kwargs['pk']
-        )
-        if (request.user != post.author):
-            return redirect('blog:post_detail', pk=post.pk)
-        return super().dispatch(request, *args, **kwargs)
-
-
 class PostCreateView(PostMixin, LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         form.instance.author = self.request.user
@@ -173,24 +137,6 @@ def add_comment(request, post_id, comment_id=None):
         comment.post = post
         comment.save()
     return redirect('blog:post_detail', pk=post_id)
-
-
-class CommentMixin(LoginRequiredMixin, View):
-    model = Comment
-    template_name = 'blog/comment.html'
-
-    def dispatch(self, request, *args, **kwargs):
-        comment = get_object_or_404(
-            Comment,
-            pk=kwargs['pk']
-        )
-        if comment.author != request.user:
-            raise PermissionDenied
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_success_url(self):
-        return reverse_lazy('blog:post_detail',
-                            kwargs={'pk': self.kwargs['pk']})
 
 
 class CommentUpdateView(CommentMixin, UpdateView):
